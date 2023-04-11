@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	v2_constants "github.com/chef/automate/components/authz-service/constants"
 	"github.com/chef/automate/components/automate-cli/pkg/adminmgmt"
 	"github.com/chef/automate/components/automate-cli/pkg/client/apiclient"
+	"github.com/chef/automate/components/automate-cli/pkg/docs"
 	"github.com/chef/automate/components/automate-cli/pkg/status"
 )
 
@@ -29,8 +31,12 @@ var iamCmdFlags = struct {
 
 func newIAMCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "iam COMMAND",
-		Short: "Chef Automate iam commands",
+		Use:               "iam COMMAND",
+		Short:             "Chef Automate iam commands",
+		PersistentPreRunE: preIAMCmd,
+		Annotations: map[string]string{
+			docs.Tag: docs.BastionHost,
+		},
 	}
 }
 
@@ -38,6 +44,9 @@ func newIAMAdminAccessCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "admin-access COMMAND",
 		Short: "Manage and restore default admin access",
+		Annotations: map[string]string{
+			docs.Tag: docs.BastionHost,
+		},
 	}
 }
 
@@ -45,6 +54,9 @@ func newIAMTokensCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "token COMMAND",
 		Short: "Manage tokens",
+		Annotations: map[string]string{
+			docs.Tag: docs.BastionHost,
+		},
 	}
 }
 
@@ -54,6 +66,9 @@ func newIAMCreateTokenCommand() *cobra.Command {
 		Short: "Generate a token",
 		RunE:  runCreateTokenCmd,
 		Args:  cobra.ExactArgs(1),
+		Annotations: map[string]string{
+			docs.Tag: docs.BastionHost,
+		},
 	}
 	cmd.PersistentFlags().BoolVar(
 		&iamCmdFlags.adminToken,
@@ -76,6 +91,9 @@ func newIAMRestoreDefaultAdminAccessCmd() *cobra.Command {
 			"to restore to factory default and update the admin user's password",
 		RunE: runRestoreDefaultAdminAccessAdminCmd,
 		Args: cobra.ExactArgs(1),
+		Annotations: map[string]string{
+			docs.Tag: docs.BastionHost,
+		},
 	}
 	cmd.PersistentFlags().BoolVar(
 		&iamCmdFlags.dryRun,
@@ -91,6 +109,9 @@ func newIAMVersionCmd() *cobra.Command {
 		Short: "Retrieve IAM version in use",
 		RunE:  runIAMVersionCmd,
 		Args:  cobra.ExactArgs(0),
+		Annotations: map[string]string{
+			docs.Tag: docs.BastionHost,
+		},
 	}
 }
 
@@ -262,5 +283,21 @@ func runCreateTokenCmd(cmd *cobra.Command, args []string) error {
 		Token string `json:"token"`
 	}{Token: tokenResp.Token.Value}
 	writer.Println(tokenResp.Token.Value)
+	return nil
+}
+
+func preIAMCmd(cmd *cobra.Command, args []string) error {
+	err := commandPrePersistent(cmd)
+	if err != nil {
+		return status.Wrap(err, status.CommandExecutionError, "unable to set command parent settings")
+	}
+	if isA2HARBFileExist() {
+		err = RunCmdOnSingleAutomateNode(cmd, args)
+		if err != nil {
+			return err
+		}
+		// NOTE: used os.exit as need to stop next lifecycle method to execute
+		os.Exit(1)
+	}
 	return nil
 }

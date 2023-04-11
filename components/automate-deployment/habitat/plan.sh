@@ -39,6 +39,7 @@ pkg_exports=(
   [port]=service.port
 )
 
+
 pkg_svc_user=root
 pkg_scaffolding="${local_scaffolding_origin:-chef}/automate-scaffolding-go"
 scaffolding_no_platform=true # Don't inject automate platform scaffolding
@@ -52,4 +53,3 @@ scaffolding_go_binary_list=(
 do_strip() {
    return 0
 }
-

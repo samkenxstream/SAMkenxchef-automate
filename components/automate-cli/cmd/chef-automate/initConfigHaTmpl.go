@@ -18,9 +18,6 @@ ssh_port = ""
 # Eg.: ssh_key_file = "~/.ssh/A2HA.pem"
 ssh_key_file = ""
 
-# Provide Password if needed to run sudo commands.
-# sudo_password = ""
-
 # Eg.: backup_config = "efs" or "s3"
 backup_config = ""
 
@@ -299,7 +296,7 @@ X-Project = ""
 `
 
 const haExistingNodesConfigTemplate = `
-# This is a Chef Automate AWS HA mode configuration file. You can run
+# This is a Chef Automate on-prem HA mode configuration file. You can run
 # 'chef-automate deploy' with this config file and it should
 # successfully create a new Chef Automate HA instances with default settings.
 
@@ -315,10 +312,6 @@ ssh_key_file = ""
 # custome ssh port no to connect instances, default will be 22
 # Eg.: ssh_port = "22"
 ssh_port = ""
-
-# Provide Password if needed to run sudo commands.
-sudo_password = ""
-## === ===
 
 secrets_key_file = "/hab/a2_deploy_workspace/secrets.key"
 secrets_store_file = "/hab/a2_deploy_workspace/secrets.json"
@@ -350,7 +343,7 @@ region = ""
 ## === INPUT NEEDED ===
 
 # Password for Automate UI for 'admin' user.
-# admin_password = ""
+admin_password = ""
 
 
 # Automate Load Balancer FQDN eg.: "chefautomate.example.com"

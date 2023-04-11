@@ -14,6 +14,7 @@ pkg_deps=(
   core/bash
   chef/mlsa
   ${local_platform_tools_origin:-chef}/automate-platform-tools
+  core/busybox-static
 )
 pkg_build_deps=(
   core/git
@@ -23,7 +24,7 @@ pkg_build_deps=(
   # We have seen failures with notification service http request
   # with external services. This is because the erlang version was bumped to
   # v23.2. Hence pinning the version till we have a fix.
-  core/erlang
+  core/erlang25
 
   # NOTE(ssd) 2019-07-03: PIN PIN PIN
   #
@@ -83,9 +84,11 @@ do_prepare() {
   mix local.hex --force
   mix local.rebar --force
   fix_interpreter "${MIX_HOME}/*" core/coreutils bin/env
+
 }
 
 do_build() {
+  ln -sf $(pkg_path_for core/busybox-static)/bin/env /usr/bin/env
   pushd "${CACHE_PATH}/server" > /dev/null
     git config --global url."https://github.com/".insteadOf git://github.com/
     MIX_ENV=habitat mix do deps.get, release

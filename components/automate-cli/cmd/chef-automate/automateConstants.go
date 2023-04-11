@@ -39,8 +39,8 @@ const PACKAGE_NAME_PATTERN = `-[a-zA-Z0-9]*-.*-\d+\.`
 const RELEASE_AND_VERSION_PATTERN = `.*-(\d+\.\d+\.*\d*)-(\d{14})-.*\.hart$`
 
 const (
-	FRONTEND_COMMANDS = `
-	sudo chef-automate config patch /tmp/%s;
+	FRONTEND_COMMAND = `
+	sudo chef-automate config %s /tmp/%s;
 	export TIMESTAMP=$(date +'%s');
 	sudo mv /etc/chef-automate/config.toml /etc/chef-automate/config.toml.$TIMESTAMP;
 	sudo chef-automate config show > sudo /etc/chef-automate/config.toml`
@@ -55,10 +55,17 @@ const (
 	automate-backend-ctl show --svc=automate-ha-%s | tail -n +2
 	`
 
-	GET_FRONTEND_CONFIG = `sudo chef-automate config show`
+	GET_BACKEND_CONFIG = `
+	source <(sudo cat /hab/sup/default/SystemdEnvironmentFile.sh);
+	automate-backend-ctl show --svc=automate-ha-%s | tail -n +2 %s
+	`
+
+	GET_FRONTEND_CONFIG = `echo "y" | sudo chef-automate config show %s`
 
 	GET_APPLIED_CONFIG = `
 	source <(sudo cat /hab/sup/default/SystemdEnvironmentFile.sh);
 	automate-backend-ctl applied --svc=automate-ha-%s
 	`
+
+	SUDO_PASSWORD_CMD = `echo "%s" | sudo -S bash -c "`
 )

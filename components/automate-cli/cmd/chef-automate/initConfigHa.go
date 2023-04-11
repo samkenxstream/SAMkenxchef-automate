@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 
+	"github.com/chef/automate/components/automate-cli/pkg/docs"
 	"github.com/chef/automate/components/automate-cli/pkg/status"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,6 @@ type AwsConfigToml struct {
 			SSHUser                     string `toml:"ssh_user"`
 			SSHKeyFile                  string `toml:"ssh_key_file"`
 			SSHPort                     string `toml:"ssh_port"`
-			SudoPassword                string `toml:"sudo_password"`
 			LoggingMonitoringManagement string `toml:"logging_monitoring_management"`
 			NewElk                      string `toml:"new_elk"`
 			ExistingElkInstanceIP       string `toml:"existing_elk_instance_ip"`
@@ -172,7 +172,6 @@ type ExistingInfraConfigToml struct {
 			SSHUser                     string `toml:"ssh_user,omitempty"`
 			SSHKeyFile                  string `toml:"ssh_key_file,omitempty"`
 			SSHPort                     string `toml:"ssh_port,omitempty"`
-			SudoPassword                string `toml:"sudo_password,omitempty"`
 			LoggingMonitoringManagement string `toml:"logging_monitoring_management,omitempty"`
 			NewElk                      string `toml:"new_elk,omitempty"`
 			ExistingElkInstanceIP       string `toml:"existing_elk_instance_ip,omitempty"`
@@ -292,6 +291,7 @@ func init() {
 		"/hab/a2_deploy_workspace/",
 		"a2ha hab workspace dir path")
 	initConfigHACmd.SetUsageTemplate(UsageTemplate)
+	initConfigHACmd.PersistentFlags().SetAnnotation("path", docs.Compatibility, []string{docs.CompatiblewithHA})
 	RootCmd.AddCommand(initConfigHACmd)
 }
 
@@ -301,6 +301,7 @@ var initConfigHACmd = &cobra.Command{
 	Long:  "Initialized default configuration for HA and save it to a file.",
 	Annotations: map[string]string{
 		NoCheckVersionAnnotation: NoCheckVersionAnnotation,
+		docs.Compatibility:       docs.CompatiblewithHA,
 	},
 	RunE: runInitConfigHACmd,
 }

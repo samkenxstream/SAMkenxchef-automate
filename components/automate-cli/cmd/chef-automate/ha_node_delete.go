@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/chef/automate/components/automate-cli/pkg/docs"
 	"github.com/chef/automate/lib/io/fileutils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -15,15 +16,14 @@ func deleteNodeHACmd() *cobra.Command {
 		Short: "remove existing node in HA",
 		Long:  `remove existing node in HA`,
 		RunE:  runDeleteNodeHACmd(&addDeleteNodeHACmdFlags),
+		Annotations: map[string]string{
+			docs.Compatibility: docs.CompatiblewithHA,
+		},
 	}
-	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.automateIp, "automate", "A", "", "Automate ip addresses to be removed. Works with --onprem-mode flag")
-	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.chefServerIp, "chef-server", "C", "", "Chef-server ip addresses to be removed. Works with --onprem-mode flag")
-	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.opensearchIp, "opensearch", "O", "", "OpenSearch ip addresses to be removed. Works with --onprem-mode flag")
-	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.postgresqlIp, "postgresql", "P", "", "Postgresql ip addresses to be removed. Works with --onprem-mode flag")
-	deleteNodeHACmd.PersistentFlags().IntVarP(&addDeleteNodeHACmdFlags.automateCount, "automate-count", "a", 0, "No of Automate instances to be removed. Works with --aws-mode flag")
-	deleteNodeHACmd.PersistentFlags().IntVarP(&addDeleteNodeHACmdFlags.chefServerCount, "chef-server-count", "c", 0, "No of chef-server instances to be removed. Works with --aws-mode flag")
-	deleteNodeHACmd.PersistentFlags().IntVarP(&addDeleteNodeHACmdFlags.opensearchCount, "opensearch-count", "o", 0, "No of opensearch instances to be removed. Works with --aws-mode flag")
-	deleteNodeHACmd.PersistentFlags().IntVarP(&addDeleteNodeHACmdFlags.postgresqlCount, "postgresql-count", "p", 0, "No of postgresql instances to be removed. Works with --aws-mode flag")
+	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.automateIp, "automate-ip", "A", "", "Automate ip addresses to be removed. Works with --onprem-mode flag")
+	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.chefServerIp, "chef-server-ip", "C", "", "Chef-server ip addresses to be removed. Works with --onprem-mode flag")
+	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.opensearchIp, "opensearch-ip", "O", "", "OpenSearch ip addresses to be removed. Works with --onprem-mode flag")
+	deleteNodeHACmd.PersistentFlags().StringVarP(&addDeleteNodeHACmdFlags.postgresqlIp, "postgresql-ip", "P", "", "Postgresql ip addresses to be removed. Works with --onprem-mode flag")
 	deleteNodeHACmd.PersistentFlags().BoolVar(&addDeleteNodeHACmdFlags.onPremMode, "onprem-mode", false, "Use this flag if the deployment type is on prem")
 	deleteNodeHACmd.PersistentFlags().BoolVar(&addDeleteNodeHACmdFlags.awsMode, "aws-mode", false, "Use this flag if the deployment type is AWS")
 	deleteNodeHACmd.PersistentFlags().BoolVarP(&addDeleteNodeHACmdFlags.autoAccept, "auto-accept", "y", false, "auto-accept")
@@ -53,16 +53,16 @@ func haDeleteNodeFactory(addDeleteNodeHACmdFlags *AddDeleteNodeHACmdFlags, deplo
 		if !addDeleteNodeHACmdFlags.awsMode {
 			hamd = NewDeleteNodeOnPrem(writer, *addDeleteNodeHACmdFlags, NewNodeUtils(), initConfigHabA2HAPathFlag.a2haDirPath, &fileutils.FileSystemUtils{}, NewSSHUtil(&SSHConfig{}))
 		} else {
-			err = fmt.Errorf("Flag given does not match with the current deployment type %s. Try with --onprem-mode flag", deployerType)
+			err = fmt.Errorf("flag given does not match with the current deployment type %s. Try with --onprem-mode flag", deployerType)
 		}
 	case AWS_MODE:
 		if !addDeleteNodeHACmdFlags.onPremMode {
-			err = fmt.Errorf("Remove node command is not supported in AWS mode yet")
+			hamd = NewDeleteNodeAWS(writer, *addDeleteNodeHACmdFlags, NewNodeUtils(), initConfigHabA2HAPathFlag.a2haDirPath, &fileutils.FileSystemUtils{}, NewSSHUtil(&SSHConfig{}))
 		} else {
-			err = fmt.Errorf("Flag given does not match with the current deployment type %s. Try with --aws-mode flag", deployerType)
+			err = fmt.Errorf("flag given does not match with the current deployment type %s. Try with --aws-mode flag", deployerType)
 		}
 	default:
-		err = fmt.Errorf("Unsupported deployment type. Current deployment type is %s", deployerType)
+		err = fmt.Errorf("unsupported deployment type. Current deployment type is %s", deployerType)
 	}
 	return hamd, err
 }

@@ -15,7 +15,9 @@ import (
 	"github.com/spf13/cobra"
 
 	dc "github.com/chef/automate/api/config/deployment"
+	"github.com/chef/automate/components/automate-cli/pkg/docs"
 	"github.com/chef/automate/components/automate-cli/pkg/status"
+	"github.com/chef/automate/components/automate-deployment/pkg/cli"
 	"github.com/chef/automate/components/automate-deployment/pkg/client"
 	"github.com/chef/toml"
 	"github.com/imdario/mergo"
@@ -24,6 +26,7 @@ import (
 var configCmdFlags = struct {
 	overwriteFile bool
 	timeout       int64
+	waitTimeout   int
 	acceptMLSA    bool
 
 	automate         bool
@@ -45,6 +48,10 @@ const (
 	For more information, run: 'chef-automate cert-rotate --help'`
 	ERROR_SELF_MANAGED_CONFIG_SHOW  = "Showing the configuration for externally configured %s is not supported."
 	ERROR_SELF_MANAGED_CONFIG_PATCH = "Patching the configuration for externally configured %s is not supported."
+	ERROR_SELF_MANAGED_CONFIG_SET   = "Setting the configuration for externally configured %s is not supported."
+	patching                        = "Config Patch"
+	setting                         = "Config Set"
+	waitTimeout                     = "wait-timeout"
 )
 
 var configValid = "Config file must be a valid %s config"
@@ -54,30 +61,73 @@ func init() {
 	configCmd.AddCommand(patchConfigCmd)
 	configCmd.AddCommand(setConfigCmd)
 
+	//config show flags
 	showConfigCmd.Flags().BoolVarP(&configCmdFlags.overwriteFile, "overwrite", "O", false, "Overwrite existing config.toml [Standalone]")
+	showConfigCmd.PersistentFlags().SetAnnotation("overwrite", docs.Compatibility, []string{docs.CompatiblewithStandalone})
 	showConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.automate, "automate", "a", false, "Shows configurations from Automate node(HA)")
+	showConfigCmd.PersistentFlags().SetAnnotation("automate", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.chef_server, "chef_server", "c", false, "Shows configurations from Chef-server node(HA)")
+	showConfigCmd.PersistentFlags().SetAnnotation("chef_server", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.postgresql, "postgresql", "p", false, "Shows configurations from PostgresQL node")
+	showConfigCmd.PersistentFlags().SetAnnotation("postgresql", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.opensearch, "opensearch", "o", false, "Shows configurations from OpenSearch node")
+	showConfigCmd.PersistentFlags().SetAnnotation("opensearch", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.automate, "a2", false, "Shows configurations from Automate node(HA)[DUPLICATE]")
+	showConfigCmd.PersistentFlags().SetAnnotation("a2", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.chef_server, "cs", false, "Shows configurations from Chef-server node(HA)[DUPLICATE]")
+	showConfigCmd.PersistentFlags().SetAnnotation("cs", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.postgresql, "pg", false, "Shows configurations from PostgresQL node[DUPLICATE]")
+	showConfigCmd.PersistentFlags().SetAnnotation("pg", docs.Compatibility, []string{docs.CompatiblewithHA})
 	showConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.opensearch, "os", false, "Shows configurations from OpenSearch node[DUPLICATE]")
+	showConfigCmd.PersistentFlags().SetAnnotation("os", docs.Compatibility, []string{docs.CompatiblewithHA})
+	showConfigCmd.PersistentFlags().IntVar(&configCmdFlags.waitTimeout, waitTimeout, DEFAULT_TIMEOUT, "This flag sets the operation timeout duration (in seconds) for each individual node during the config show process")
+	showConfigCmd.PersistentFlags().SetAnnotation(waitTimeout, docs.Compatibility, []string{docs.CompatiblewithHA})
 
+	// config patch flags
 	patchConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.frontend, "frontend", "f", false, "Patch toml configuration to the all frontend nodes")
+	patchConfigCmd.PersistentFlags().SetAnnotation("frontend", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.frontend, "fe", false, "Patch toml configuration to the all frontend nodes[DUPLICATE]")
-
+	patchConfigCmd.PersistentFlags().SetAnnotation("fe", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.automate, "automate", "a", false, "Patch toml configuration to the automate node")
+	patchConfigCmd.PersistentFlags().SetAnnotation("automate", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.automate, "a2", false, "Patch toml configuration to the automate node[DUPLICATE]")
+	patchConfigCmd.PersistentFlags().SetAnnotation("a2", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.chef_server, "chef_server", "c", false, "Patch toml configuration to the chef_server node")
+	patchConfigCmd.PersistentFlags().SetAnnotation("chef_server", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.chef_server, "cs", false, "Patch toml configuration to the chef_server node[DUPLICATE]")
+	patchConfigCmd.PersistentFlags().SetAnnotation("cs", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.opensearch, "opensearch", "o", false, "Patch toml configuration to the opensearch node")
+	patchConfigCmd.PersistentFlags().SetAnnotation("opensearch", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.opensearch, "os", false, "Patch toml configuration to the opensearch node[DUPLICATE]")
+	patchConfigCmd.PersistentFlags().SetAnnotation("os", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.postgresql, "postgresql", "p", false, "Patch toml configuration to the postgresql node")
+	patchConfigCmd.PersistentFlags().SetAnnotation("postgresql", docs.Compatibility, []string{docs.CompatiblewithHA})
 	patchConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.postgresql, "pg", false, "Patch toml configuration to the postgresql node[DUPLICATE]")
+	patchConfigCmd.PersistentFlags().SetAnnotation("pg", docs.Compatibility, []string{docs.CompatiblewithHA})
+	patchConfigCmd.PersistentFlags().IntVar(&configCmdFlags.waitTimeout, waitTimeout, DEFAULT_TIMEOUT, "This flag sets the operation timeout duration (in seconds) for each individual node during the config patch process")
+	patchConfigCmd.PersistentFlags().SetAnnotation(waitTimeout, docs.Compatibility, []string{docs.CompatiblewithHA})
+
+	// config set flags
+	setConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.automate, "automate", "a", false, "Set toml configuration to the automate node")
+	setConfigCmd.PersistentFlags().SetAnnotation("automate", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.automate, "a2", false, "Set toml configuration to the automate node[DUPLICATE]")
+	setConfigCmd.PersistentFlags().SetAnnotation("a2", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.chef_server, "chef_server", "c", false, "Set toml configuration to the chef_server node")
+	setConfigCmd.PersistentFlags().SetAnnotation("chef_server", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.chef_server, "cs", false, "Set toml configuration to the chef_server node[DUPLICATE]")
+	setConfigCmd.PersistentFlags().SetAnnotation("cs", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.opensearch, "opensearch", "o", false, "Set toml configuration to the opensearch node")
+	setConfigCmd.PersistentFlags().SetAnnotation("opensearch", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.opensearch, "os", false, "Set toml configuration to the opensearch node[DUPLICATE]")
+	setConfigCmd.PersistentFlags().SetAnnotation("os", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVarP(&configCmdFlags.postgresql, "postgresql", "p", false, "Set toml configuration to the postgresql node")
+	setConfigCmd.PersistentFlags().SetAnnotation("postgresql", docs.Compatibility, []string{docs.CompatiblewithHA})
+	setConfigCmd.PersistentFlags().BoolVar(&configCmdFlags.postgresql, "pg", false, "Set toml configuration to the postgresql node[DUPLICATE]")
+	setConfigCmd.PersistentFlags().SetAnnotation("pg", docs.Compatibility, []string{docs.CompatiblewithHA})
 
 	configCmd.PersistentFlags().BoolVarP(&configCmdFlags.acceptMLSA, "auto-approve", "y", false, "Do not prompt for confirmation; accept defaults and continue")
 	configCmd.PersistentFlags().Int64VarP(&configCmdFlags.timeout, "timeout", "t", 10, "Request timeout in seconds")
+	configCmd.PersistentFlags().SetAnnotation("timeout", docs.Compatibility, []string{docs.CompatiblewithStandalone})
 
 	RootCmd.AddCommand(configCmd)
 }
@@ -93,6 +143,9 @@ var showConfigCmd = &cobra.Command{
 	Long:  "Show the Chef Automate configuration. When given a filepath, the output will be written to the file instead of printed to STDOUT",
 	RunE:  runShowCmd,
 	Args:  cobra.RangeArgs(0, 2),
+	Annotations: map[string]string{
+		docs.Tag: docs.BastionHost,
+	},
 }
 
 var patchConfigCmd = &cobra.Command{
@@ -100,6 +153,9 @@ var patchConfigCmd = &cobra.Command{
 	Short: "patch the Chef Automate configuration", Long: "Apply a partial Chef Automate configuration to the deployment. It will take the partial configuration, merge it with the existing configuration, and apply and required changes.",
 	RunE: runPatchCommand,
 	Args: cobra.ExactArgs(1),
+	Annotations: map[string]string{
+		docs.Tag: docs.BastionHost,
+	},
 }
 
 var setConfigCmd = &cobra.Command{
@@ -108,6 +164,9 @@ var setConfigCmd = &cobra.Command{
 	Long:  "Set the Chef Automate configuration for the deployment. It will replace the Chef Automate configuration with the given configuration and apply any required changes.",
 	RunE:  runSetCommand,
 	Args:  cobra.ExactArgs(1),
+	Annotations: map[string]string{
+		docs.Tag: docs.BastionHost,
+	},
 }
 
 func runShowCmd(cmd *cobra.Command, args []string) error {
@@ -117,7 +176,7 @@ func runShowCmd(cmd *cobra.Command, args []string) error {
 		if isManagedServicesOn() {
 			err := errorOnSelfManaged(configCmdFlags.postgresql, configCmdFlags.opensearch)
 			if err != nil {
-				return status.Annotate(err,status.InvalidCommandArgsError)
+				return status.Annotate(err, status.InvalidCommandArgsError)
 			}
 		}
 
@@ -126,51 +185,94 @@ func runShowCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		sshUser := infra.Outputs.SSHUser.Value
-		sskKeyFile := infra.Outputs.SSHKeyFile.Value
-		sshPort := infra.Outputs.SSHPort.Value
-
-		sshConfig := &SSHConfig{
-			sshUser:    sshUser,
-			sshKeyFile: sskKeyFile,
-			sshPort:    sshPort,
+		if configCmdFlags.waitTimeout < DEFAULT_TIMEOUT {
+			return errors.Errorf("The operation timeout duration for each individual node during the config show process should be set to a value greater than %v seconds.", DEFAULT_TIMEOUT)
 		}
-		sshUtil := NewSSHUtil(sshConfig)
+
+		var outFrontend string
+		var outBackend string
+		var outFiles []string
+		if len(args) > 0 && args[0] != "" {
+			outFrontend = args[0]
+			outBackend = "> " + args[0]
+			outFiles = []string{outFrontend}
+		}
+		frontendCommand := fmt.Sprintf(GET_FRONTEND_CONFIG, outFrontend)
+		postgresqlCommand := fmt.Sprintf(GET_BACKEND_CONFIG, "postgresql", outBackend)
+		opensearchCommand := fmt.Sprintf(GET_BACKEND_CONFIG, "opensearch", outBackend)
+
+		frontend := &Cmd{
+			CmdInputs: &CmdInputs{
+				NodeType: false,
+			},
+		}
+
+		automate := &Cmd{
+			CmdInputs: &CmdInputs{
+				Cmd:         frontendCommand,
+				WaitTimeout: configCmdFlags.waitTimeout,
+				Single:      false,
+				InputFiles:  []string{},
+				Outputfiles: outFiles,
+				NodeType:    configCmdFlags.automate,
+			},
+		}
+
+		chefServer := &Cmd{
+			CmdInputs: &CmdInputs{
+				Cmd:         frontendCommand,
+				WaitTimeout: configCmdFlags.waitTimeout,
+				Single:      false,
+				InputFiles:  []string{},
+				Outputfiles: outFiles,
+				NodeType:    configCmdFlags.chef_server,
+			},
+		}
+
+		postgresql := &Cmd{
+			CmdInputs: &CmdInputs{
+				Cmd:         postgresqlCommand,
+				WaitTimeout: configCmdFlags.waitTimeout,
+				Single:      false,
+				InputFiles:  []string{},
+				Outputfiles: outFiles,
+				NodeType:    configCmdFlags.postgresql,
+			},
+		}
+
+		opensearch := &Cmd{
+			CmdInputs: &CmdInputs{
+				Cmd:         opensearchCommand,
+				WaitTimeout: configCmdFlags.waitTimeout,
+				Single:      false,
+				InputFiles:  []string{},
+				Outputfiles: outFiles,
+				NodeType:    configCmdFlags.opensearch,
+			},
+		}
+
+		nodeMap := &NodeTypeAndCmd{
+			Frontend:   frontend,
+			Automate:   automate,
+			ChefServer: chefServer,
+			Postgresql: postgresql,
+			Opensearch: opensearch,
+			Infra:      infra,
+		}
+
+		cmdUtil := NewRemoteCmdExecutor(nodeMap)
 
 		if configCmdFlags.overwriteFile {
 			writer.Errorln("Overwrite flag is not supported in HA")
 		}
 
-		var scriptCommand string
-		var hostIpArray []string
-		switch true {
-		case configCmdFlags.automate:
-			hostIpArray = infra.Outputs.AutomatePrivateIps.Value
-			scriptCommand = GET_FRONTEND_CONFIG
-		case configCmdFlags.chef_server:
-			hostIpArray = infra.Outputs.ChefServerPrivateIps.Value
-			scriptCommand = GET_FRONTEND_CONFIG
-		case configCmdFlags.postgresql:
-			hostIpArray = infra.Outputs.PostgresqlPrivateIps.Value
-			scriptCommand = fmt.Sprintf(GET_CONFIG, "postgresql")
-		case configCmdFlags.opensearch:
-			hostIpArray = infra.Outputs.OpensearchPrivateIps.Value
-			scriptCommand = fmt.Sprintf(GET_CONFIG, "opensearch")
-		default:
-			return errors.New("Missing or Unsupported flag\n Please run the following command to see all available flags \n\n`chef-automate config show --help`\n")
+		if configCmdFlags.automate || configCmdFlags.chef_server || configCmdFlags.postgresql || configCmdFlags.opensearch {
+			err = cmdUtil.Execute()
+		} else {
+			writer.Println(cmd.UsageString())
 		}
 
-		for i := 0; i < len(hostIpArray); i++ {
-			sshUtil.getSSHConfig().hostIP = hostIpArray[i]
-			output, err := sshUtil.connectAndExecuteCommandOnRemote(scriptCommand, true)
-			if err != nil {
-				return err
-			}
-			writer.Success("Configuration from " + hostIpArray[i] + " node:\n")
-			writer.Println(output)
-		}
-
-		return nil
+		return err
 	}
 	res, err := client.GetAutomateConfig(configCmdFlags.timeout)
 	if err != nil {
@@ -246,6 +348,225 @@ func runPatchCommand(cmd *cobra.Command, args []string) error {
 
 	if isA2HARBFileExist() {
 
+		infra, err := getAutomateHAInfraDetails()
+		if err != nil {
+			return err
+		}
+		timestamp := time.Now().Format("20060102150405")
+		if configCmdFlags.waitTimeout < DEFAULT_TIMEOUT {
+			return errors.Errorf("The operation timeout duration for each individual node during the config patch process should be set to a value greater than %v seconds.", DEFAULT_TIMEOUT)
+		}
+
+		configFile := args[0]
+		frontend := &Cmd{
+			PreExec: prePatchCheckForFrontendNodes,
+			CmdInputs: &CmdInputs{
+				Cmd:                      fmt.Sprintf(FRONTEND_COMMAND, PATCH, "frontend"+"_"+timestamp+"_"+configFile, dateFormat),
+				WaitTimeout:              configCmdFlags.waitTimeout,
+				Single:                   false,
+				Args:                     args,
+				InputFiles:               []string{configFile},
+				ErrorCheckEnableInOutput: true,
+				NodeType:                 configCmdFlags.frontend,
+			},
+		}
+
+		automate := &Cmd{
+			PreExec: prePatchCheckForFrontendNodes,
+			CmdInputs: &CmdInputs{
+				Cmd:                      fmt.Sprintf(FRONTEND_COMMAND, PATCH, "automate"+"_"+timestamp+"_"+configFile, dateFormat),
+				WaitTimeout:              configCmdFlags.waitTimeout,
+				Single:                   false,
+				Args:                     args,
+				InputFiles:               []string{configFile},
+				ErrorCheckEnableInOutput: true,
+				NodeType:                 configCmdFlags.automate,
+			},
+		}
+
+		chefServer := &Cmd{
+			PreExec: prePatchCheckForFrontendNodes,
+			CmdInputs: &CmdInputs{
+				Cmd:                      fmt.Sprintf(FRONTEND_COMMAND, PATCH, "chef_server"+"_"+timestamp+"_"+configFile, dateFormat),
+				WaitTimeout:              configCmdFlags.waitTimeout,
+				Single:                   false,
+				Args:                     args,
+				InputFiles:               []string{configFile},
+				ErrorCheckEnableInOutput: true,
+				NodeType:                 configCmdFlags.chef_server,
+			},
+		}
+
+		postgresql := &Cmd{
+			PreExec: prePatchCheckForPostgresqlNodes,
+			CmdInputs: &CmdInputs{
+				Cmd:                      fmt.Sprintf(BACKEND_COMMAND, dateFormat, "postgresql", "%s", "postgresql"+"_"+timestamp+"_"+configFile),
+				Args:                     args,
+				WaitTimeout:              configCmdFlags.waitTimeout,
+				Single:                   true,
+				InputFiles:               []string{configFile},
+				ErrorCheckEnableInOutput: true,
+				NodeType:                 configCmdFlags.postgresql,
+			},
+		}
+
+		opensearch := &Cmd{
+			PreExec: prePatchCheckForOpensearch,
+			CmdInputs: &CmdInputs{
+				Cmd:                      fmt.Sprintf(BACKEND_COMMAND, dateFormat, "opensearch", "%s", "opensearch"+"_"+timestamp+"_"+configFile),
+				Args:                     args,
+				WaitTimeout:              configCmdFlags.waitTimeout,
+				Single:                   true,
+				InputFiles:               []string{configFile},
+				ErrorCheckEnableInOutput: true,
+				NodeType:                 configCmdFlags.opensearch,
+			},
+		}
+
+		nodeMap := &NodeTypeAndCmd{
+			Frontend:   frontend,
+			Automate:   automate,
+			ChefServer: chefServer,
+			Postgresql: postgresql,
+			Opensearch: opensearch,
+			Infra:      infra,
+		}
+
+		cmdUtil := NewRemoteCmdExecutor(nodeMap)
+
+		if configCmdFlags.frontend || configCmdFlags.automate || configCmdFlags.chef_server || configCmdFlags.postgresql || configCmdFlags.opensearch {
+			err = cmdUtil.Execute()
+		} else {
+			writer.Println(cmd.UsageString())
+		}
+
+		if err != nil {
+			return err
+		}
+
+	} else {
+		cfg, err := dc.LoadUserOverrideConfigFile(args[0])
+		if err != nil {
+			return status.Annotate(err, status.ConfigError)
+		}
+		if err = client.PatchAutomateConfig(configCmdFlags.timeout, cfg, writer); err != nil {
+			return err
+		}
+		writer.Success("Configuration patched")
+	}
+
+	return nil
+}
+
+// prePatchCheckForFrontendNodes patches the configuration for front end nodes in Automate HA
+func prePatchCheckForFrontendNodes(inputs *CmdInputs, sshUtil SSHUtil, infra *AutomteHAInfraDetails, remoteService string, timestamp string, writer *cli.Writer) error {
+	srcPath, err := parseAndRemoveRestrictedKeysFromSrcFile(inputs.Args[0])
+	if err != nil {
+		return err
+	}
+
+	inputs.InputFiles[0] = srcPath
+
+	return nil
+}
+
+// prePatchCheckForPostgresqlNodes patches the config for postgresql nodes in Automate HA
+func prePatchCheckForPostgresqlNodes(inputs *CmdInputs, sshUtil SSHUtil, infra *AutomteHAInfraDetails, remoteService string, timestamp string, writer *cli.Writer) error {
+	if isManagedServicesOn() {
+		return status.Errorf(status.InvalidCommandArgsError, ERROR_SELF_MANAGED_CONFIG_PATCH, "Postgresql")
+	}
+
+	if len(infra.Outputs.PostgresqlPrivateIps.Value) == 0 {
+		writer.Error("Postgres IPs not found in the config. Please contact the support team")
+		return nil
+	}
+
+	args := inputs.Args
+
+	//checking for log configuration
+	err := enableCentralizedLogConfigForHA(args, remoteService, sshUtil, infra.Outputs.PostgresqlPrivateIps.Value)
+	if err != nil {
+		return err
+	}
+
+	//checking database configuration
+	existConfig, reqConfig, err := getExistingAndRequestedConfigForPostgres(args, infra, GET_APPLIED_CONFIG, sshUtil)
+	if err != nil {
+		return err
+	}
+
+	//Implementing the config if there is some change in the database configuration
+	isConfigChangedDatabase := isConfigChanged(existConfig, reqConfig)
+
+	if isConfigChangedDatabase {
+		if reqConfig.Ssl != nil {
+			writer.Warn(fmt.Sprintf(CERT_WARNING, "ssl"))
+		}
+		reqConfig.Ssl = nil
+
+		tomlFile := args[0]
+		tomlFilePath, err := createTomlFileFromConfig(&reqConfig, tomlFile)
+		if err != nil {
+			return err
+		}
+
+		inputs.InputFiles[0] = tomlFilePath
+	} else {
+		return errors.New("No changes in existing config on postgresql and provided config")
+	}
+	return nil
+}
+
+// prePatchCheckForOpensearch patches the config for open-search nodes in Automate HA
+func prePatchCheckForOpensearch(inputs *CmdInputs, sshUtil SSHUtil, infra *AutomteHAInfraDetails, remoteService string, timestamp string, writer *cli.Writer) error {
+	if isManagedServicesOn() {
+		return status.Errorf(status.InvalidCommandArgsError, ERROR_SELF_MANAGED_CONFIG_PATCH, "OpenSearch")
+	}
+
+	if len(infra.Outputs.OpensearchPrivateIps.Value) == 0 {
+		writer.Error("OpenSearch IPs not found in the config. Please contact the support team")
+		return nil
+	}
+
+	args := inputs.Args
+
+	//checking for log configuration
+	err := enableCentralizedLogConfigForHA(args, remoteService, sshUtil, infra.Outputs.OpensearchPrivateIps.Value)
+	if err != nil {
+		return err
+	}
+
+	//checking database configuration
+	existConfig, reqConfig, err := getExistingAndRequestedConfigForOpenSearch(args, infra, GET_APPLIED_CONFIG, sshUtil)
+	if err != nil {
+		return err
+	}
+
+	//Implementing the config if there is some change in the database configuration
+	isConfigChangedDatabase := isConfigChanged(existConfig, reqConfig)
+
+	if isConfigChangedDatabase {
+		if reqConfig.TLS != nil {
+			writer.Warn(fmt.Sprintf(CERT_WARNING, "tls"))
+		}
+		reqConfig.TLS = nil
+
+		tomlFile := args[0]
+		tomlFilePath, err := createTomlFileFromConfig(&reqConfig, tomlFile)
+		if err != nil {
+			return err
+		}
+
+		inputs.InputFiles[0] = tomlFilePath
+	} else {
+		return errors.New("No changes in existing config on opensearch and provided config")
+	}
+	return nil
+}
+
+func runSetCommand(cmd *cobra.Command, args []string) error {
+	if isA2HARBFileExist() {
+
 		var err error
 		infra, err := getAutomateHAInfraDetails()
 		if err != nil {
@@ -257,28 +578,22 @@ func runPatchCommand(cmd *cobra.Command, args []string) error {
 		sshPort := infra.Outputs.SSHPort.Value
 
 		timestamp := time.Now().Format("20060102150405")
+
 		sshConfig := &SSHConfig{
 			sshUser:    sshUser,
 			sshKeyFile: sskKeyFile,
 			sshPort:    sshPort,
 		}
 		sshUtil := NewSSHUtil(sshConfig)
-		if configCmdFlags.frontend {
-			frontendIps := append(infra.Outputs.ChefServerPrivateIps.Value, infra.Outputs.AutomatePrivateIps.Value...)
-			if len(frontendIps) == 0 {
-				writer.Error("No frontend IPs are found")
-				os.Exit(1)
-			}
-			const remoteService string = "frontend"
-			err = setConfigForFrontEndNodes(args, sshUtil, frontendIps, remoteService, timestamp)
-		} else if configCmdFlags.automate {
+
+		if configCmdFlags.automate {
 			frontendIps := infra.Outputs.AutomatePrivateIps.Value
 			if len(frontendIps) == 0 {
 				writer.Error("No automate IPs are found")
 				os.Exit(1)
 			}
 			const remoteService string = "automate"
-			err = setConfigForFrontEndNodes(args, sshUtil, frontendIps, remoteService, timestamp)
+			err = setConfigForFrontEndNodes(args, sshUtil, frontendIps, remoteService, timestamp, writer)
 		} else if configCmdFlags.chef_server {
 			frontendIps := infra.Outputs.ChefServerPrivateIps.Value
 			if len(frontendIps) == 0 {
@@ -286,67 +601,116 @@ func runPatchCommand(cmd *cobra.Command, args []string) error {
 				os.Exit(1)
 			}
 			const remoteService string = "chef-server"
-			err = setConfigForFrontEndNodes(args, sshUtil, frontendIps, remoteService, timestamp)
+			err = setConfigForFrontEndNodes(args, sshUtil, frontendIps, remoteService, timestamp, writer)
 		} else if configCmdFlags.postgresql {
 			const remoteService string = "postgresql"
-			err = setConfigForPostgresqlNodes(args, remoteService, sshUtil, infra, timestamp)
+			err = setConfigForPostgresqlNodes(args, remoteService, sshUtil, infra, timestamp, writer)
 		} else if configCmdFlags.opensearch {
 			const remoteService string = "opensearch"
-			err = setConfigForOpensearch(args, remoteService, sshUtil, infra, timestamp)
-
+			err = setConfigForOpensearch(args, remoteService, sshUtil, infra, timestamp, writer)
 		} else {
 			writer.Println(cmd.UsageString())
 		}
 		if err != nil {
 			return err
 		}
-
 	} else {
-
 		cfg, err := dc.LoadUserOverrideConfigFile(args[0])
 		if err != nil {
 			return status.Annotate(err, status.ConfigError)
 		}
-		if err = client.PatchAutomateConfig(configCmdFlags.timeout, cfg, writer); err != nil {
+
+		if err := client.SetAutomateConfig(configCmdFlags.timeout, cfg, writer); err != nil {
 			return err
 		}
+		writer.Success("Configuration set")
 	}
-
-	// writer.Success("Configuration patched")
 	return nil
 }
 
-// setConfigForFrontEndNodes patches the configuration for front end nodes in Automate HA
-func setConfigForFrontEndNodes(args []string, sshUtil SSHUtil, frontendIps []string, remoteService string, timestamp string) error {
-	scriptCommands := fmt.Sprintf(FRONTEND_COMMANDS, remoteService+timestamp, dateFormat)
-	srcPath, err := parseAndRemoveRestrictedKeysFromSrcFile(args[0])
-	if err != nil {
-		return err
+type ResultConfigSet struct {
+	HostIP string
+	Output string
+	Error  error
+}
+
+// setConfigForFrontEndNodes set the configuration for front end nodes in Automate HA
+func setConfigForFrontEndNodes(args []string, sshUtil SSHUtil, frontendIps []string, remoteService string, timestamp string, cliWriter *cli.Writer) error {
+	resultChan := make(chan ResultConfigSet, len(frontendIps))
+	configFile := remoteService + timestamp
+	scriptCommands := fmt.Sprintf(FRONTEND_COMMAND, SET, configFile, dateFormat)
+	originalSSHConfig := sshUtil.getSSHConfig()
+
+	for _, hostIP := range frontendIps {
+		newSSHConfig := &SSHConfig{
+			sshUser:    originalSSHConfig.sshUser,
+			sshPort:    originalSSHConfig.sshPort,
+			sshKeyFile: originalSSHConfig.sshKeyFile,
+			hostIP:     hostIP,
+		}
+		newSSHUtil := NewSSHUtil(newSSHConfig)
+
+		printConnectionMessage(remoteService, hostIP, cliWriter)
+
+		go func(args []string, configFile string, remoteService string, scriptCommands string, newSSHUtil SSHUtil, resultChan chan ResultConfigSet) {
+			rc := ResultConfigSet{newSSHUtil.getSSHConfig().hostIP, "", nil}
+			err := newSSHUtil.copyFileToRemote(args[0], configFile, false)
+			if err != nil {
+				rc.Error = err
+				resultChan <- rc
+				return
+			}
+
+			output, err := newSSHUtil.connectAndExecuteCommandOnRemote(scriptCommands, true)
+			if err != nil {
+				rc.Error = err
+				resultChan <- rc
+				return
+			}
+
+			err = checkOutputForError(output)
+			if err != nil {
+				rc.Error = err
+				resultChan <- rc
+				return
+			}
+
+			rc.Output = output
+			resultChan <- rc
+		}(args, configFile, remoteService, scriptCommands, newSSHUtil, resultChan)
 	}
+
 	for i := 0; i < len(frontendIps); i++ {
-		writer.Print("Connecting to the " + remoteService + " node : " + frontendIps[i])
-		sshUtil.getSSHConfig().hostIP = frontendIps[i]
-		err := sshUtil.copyFileToRemote(srcPath, remoteService+timestamp, false)
-		if err != nil {
-			writer.Errorf("%v", err)
-			return err
+		result := <-resultChan
+
+		if i == 0 {
+			writer.StopSpinner()
+			cliWriter.Println("=====================================================")
 		}
-		output, err := sshUtil.connectAndExecuteCommandOnRemote(scriptCommands, true)
-		if err != nil {
-			writer.Errorf("%v", err)
-			return err
+
+		if result.Error != nil {
+			printConfigErrorMessage(setting, remoteService, result.HostIP, cliWriter, result.Error.Error())
+		} else {
+			cliWriter.Printf("Output for Host IP %s : %s", result.HostIP, result.Output+"\n")
+			printConfigSuccessMessage(setting, remoteService, result.HostIP, cliWriter)
 		}
-		writer.Printf(output + "\n")
-		writer.Success("Patching is completed on " + remoteService + " node : " + frontendIps[i] + "\n")
+
+		if i < len(frontendIps)-1 {
+			cliWriter.Println("=====================================================")
+			writer.StartSpinner()
+		}
 	}
+
+	close(resultChan)
 	return nil
 }
 
-// setConfigForPostgresqlNodes patches the config for postgresql nodes in Automate HA
-func setConfigForPostgresqlNodes(args []string, remoteService string, sshUtil SSHUtil, infra *AutomteHAInfraDetails, timestamp string) error {
+// setConfigForPostgresqlNodes set the configuration for postgresql nodes in Automate HA
+func setConfigForPostgresqlNodes(args []string, remoteService string, sshUtil SSHUtil, infra *AutomteHAInfraDetails, timestamp string, writer *cli.Writer) error {
 	if isManagedServicesOn() {
-		return status.Errorf(status.InvalidCommandArgsError,ERROR_SELF_MANAGED_CONFIG_PATCH, "Postgresql")
+		return status.Errorf(status.InvalidCommandArgsError, ERROR_SELF_MANAGED_CONFIG_SET, "Postgresql")
 	}
+
 	if len(infra.Outputs.PostgresqlPrivateIps.Value) == 0 {
 		writer.Error("Postgres IPs not found in the config. Please contact the support team")
 		return nil
@@ -357,110 +721,85 @@ func setConfigForPostgresqlNodes(args []string, remoteService string, sshUtil SS
 	if err != nil {
 		return err
 	}
-	//checking database configuration
-	existConfig, reqConfig, err := getExistingAndRequestedConfigForPostgres(args, infra, GET_APPLIED_CONFIG, sshUtil)
+
+	//Getting Requested Config
+	reqConfigInterface, err := getConfigForArgsPostgresqlOrOpenSearch(args, postgresql)
+	if err != nil {
+		return err
+	}
+	reqConfig := reqConfigInterface.(PostgresqlConfig)
+
+	//Setting the config
+	tomlFile := args[0] + timestamp
+	tomlFilePath, err := createTomlFileFromConfig(&reqConfig, tomlFile)
 	if err != nil {
 		return err
 	}
 
-	isConfigChangedDatabase := isConfigChanged(existConfig, reqConfig)
-	//Implementing the config if there is some change in the database configuration
-	if isConfigChangedDatabase {
-		tomlFile := args[0] + timestamp
-		if reqConfig.Ssl != nil {
-			writer.Warn(fmt.Sprintf(CERT_WARNING, "ssl"))
-		}
-		reqConfig.Ssl = nil
-		tomlFilePath, err := createTomlFileFromConfig(&reqConfig, tomlFile)
-		if err != nil {
-			return err
-		}
-		scriptCommands := fmt.Sprintf(BACKEND_COMMAND, dateFormat, remoteService, "%s", remoteService+timestamp)
-		sshUtil.getSSHConfig().hostIP = infra.Outputs.PostgresqlPrivateIps.Value[0]
-		writer.Println("Connecting to the " + remoteService + " node : " + sshUtil.getSSHConfig().hostIP)
-		err = sshUtil.copyFileToRemote(tomlFilePath, remoteService+timestamp, true)
-		if err != nil {
-			writer.Errorf("%v", err)
-			return err
-		}
-		output, err := sshUtil.connectAndExecuteCommandOnRemote(scriptCommands, true)
-		if err != nil {
-			writer.Errorf("%v", err)
-			return err
-		}
-		writer.Printf(output + "\n")
-		writer.Success("Patching is completed on " + remoteService + " node : " + sshUtil.getSSHConfig().hostIP + "\n")
-
-	}
-
-	return nil
+	return setConfigForPostgresqlAndOpensearch(remoteService, timestamp, sshUtil, infra.Outputs.PostgresqlPrivateIps.Value[0], tomlFilePath, writer)
 }
 
-// setConfigForOpensearch patches the config for open-search nodes in Automate HA
-func setConfigForOpensearch(args []string, remoteService string, sshUtil SSHUtil, infra *AutomteHAInfraDetails, timestamp string) error {
+// setConfigForOpensearch set the configuration for opensearch nodes in Automate HA
+func setConfigForOpensearch(args []string, remoteService string, sshUtil SSHUtil, infra *AutomteHAInfraDetails, timestamp string, writer *cli.Writer) error {
 	if isManagedServicesOn() {
-		return status.Errorf(status.InvalidCommandArgsError,ERROR_SELF_MANAGED_CONFIG_PATCH, "OpenSearch")
+		return status.Errorf(status.InvalidCommandArgsError, ERROR_SELF_MANAGED_CONFIG_SET, "OpenSearch")
 	}
+
 	if len(infra.Outputs.OpensearchPrivateIps.Value) == 0 {
 		writer.Error("OpenSearch IPs not found in the config. Please contact the support team")
 		return nil
 	}
+
 	//checking for log configuration
 	err := enableCentralizedLogConfigForHA(args, remoteService, sshUtil, infra.Outputs.OpensearchPrivateIps.Value)
 	if err != nil {
 		return err
 	}
-	//checking database configuration
-	existConfig, reqConfig, err := getExistingAndRequestedConfigForOpenSearch(args, infra, GET_APPLIED_CONFIG, sshUtil)
+
+	//Getting Requested Config
+	reqConfigInterface, err := getConfigForArgsPostgresqlOrOpenSearch(args, opensearch_const)
 	if err != nil {
 		return err
 	}
-	isConfigChangedDatabase := isConfigChanged(existConfig, reqConfig)
-	//Implementing the config if there is some change in the database configuration
-	if isConfigChangedDatabase {
-		tomlFile := args[0] + timestamp
+	reqConfig := reqConfigInterface.(OpensearchConfig)
 
-		if reqConfig.TLS != nil {
-			writer.Warn(fmt.Sprintf(CERT_WARNING, "tls"))
-		}
-		reqConfig.TLS = nil
-		tomlFilePath, err := createTomlFileFromConfig(&reqConfig, tomlFile)
-
-		if err != nil {
-			return err
-		}
-		scriptCommands := fmt.Sprintf(BACKEND_COMMAND, dateFormat, remoteService, "%s", remoteService+timestamp)
-
-		sshUtil.getSSHConfig().hostIP = infra.Outputs.OpensearchPrivateIps.Value[0]
-		writer.Println("Connecting to the " + remoteService + " node : " + sshUtil.getSSHConfig().hostIP)
-		err = sshUtil.copyFileToRemote(tomlFilePath, remoteService+timestamp, true)
-		if err != nil {
-			writer.Errorf("%v", err)
-			return err
-		}
-		output, err := sshUtil.connectAndExecuteCommandOnRemote(scriptCommands, true)
-		if err != nil {
-			writer.Errorf("%v", err)
-			return err
-		}
-		writer.Printf(output + "\n")
-		writer.Success("Patching is completed on " + remoteService + " node : " + sshUtil.getSSHConfig().hostIP + "\n")
+	//Setting the config
+	tomlFile := args[0] + timestamp
+	tomlFilePath, err := createTomlFileFromConfig(&reqConfig, tomlFile)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	return setConfigForPostgresqlAndOpensearch(remoteService, timestamp, sshUtil, infra.Outputs.OpensearchPrivateIps.Value[0], tomlFilePath, writer)
 }
 
-func runSetCommand(cmd *cobra.Command, args []string) error {
-	cfg, err := dc.LoadUserOverrideConfigFile(args[0])
-	if err != nil {
-		return status.Annotate(err, status.ConfigError)
-	}
+// setConfigForPostgresqlAndOpensearch set the configuration for postgresql and opensearch nodes in Automate HA
+func setConfigForPostgresqlAndOpensearch(remoteService string, timestamp string, sshUtil SSHUtil, hostIP string, tomlFilePath string, writer *cli.Writer) error {
+	scriptCommands := fmt.Sprintf(BACKEND_COMMAND, dateFormat, remoteService, "%s", remoteService+timestamp)
 
-	if err := client.SetAutomateConfig(configCmdFlags.timeout, cfg, writer); err != nil {
+	sshUtil.getSSHConfig().hostIP = hostIP
+	printConnectionMessage(remoteService, sshUtil.getSSHConfig().hostIP, writer)
+
+	err := sshUtil.copyFileToRemote(tomlFilePath, remoteService+timestamp, true)
+	if err != nil {
+		writer.Errorf("%v", err)
 		return err
 	}
 
-	writer.Success("Configuration set")
+	output, err := sshUtil.connectAndExecuteCommandOnRemote(scriptCommands, true)
+	if err != nil {
+		writer.Errorf("%v", err)
+		return err
+	}
+
+	err = checkOutputForError(output)
+	if err != nil {
+		return err
+	}
+
+	writer.Printf(output + "\n")
+	printConfigSuccessMessage(setting, remoteService, sshUtil.getSSHConfig().hostIP, writer)
+
 	return nil
 }
 
@@ -736,4 +1075,30 @@ func parseAndRemoveRestrictedKeysFromSrcFile(srcString string) (string, error) {
 		}
 		return srcString, nil
 	}
+}
+
+// If the output contains the word "error" then return error
+func checkOutputForError(output string) error {
+	if strings.Contains(strings.ToUpper(strings.TrimSpace(output)), "ERROR") {
+		return errors.New(output)
+	}
+	return nil
+}
+
+// printConnectionMessage prints the connection message
+func printConnectionMessage(remoteService string, hostIP string, cliWriter *cli.Writer) {
+	cliWriter.Println("Connecting to the " + remoteService + " node : " + hostIP)
+	cliWriter.BufferWriter().Flush()
+}
+
+// printConfigErrorMessage prints the config error message
+func printConfigErrorMessage(configType string, remoteService string, hostIP string, cliWriter *cli.Writer, err string) {
+	cliWriter.Fail(configType + " failed on " + remoteService + " node : " + hostIP + " with error:\n" + err + "\n")
+	cliWriter.BufferWriter().Flush()
+}
+
+// printConfigSuccessMessage prints the config success message
+func printConfigSuccessMessage(configType string, remoteService string, hostIP string, cliWriter *cli.Writer) {
+	cliWriter.Success(configType + " is completed on " + remoteService + " node : " + hostIP + "\n")
+	cliWriter.BufferWriter().Flush()
 }

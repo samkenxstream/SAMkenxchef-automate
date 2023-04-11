@@ -47,11 +47,14 @@ func DefaultConfigRequest() *ConfigRequest {
 
 	c.V1.Sys.Api.AuthSkew = w.Int32(900)
 	c.V1.Sys.Api.BulkFetchBatchSize = w.Int32(5)
-	c.V1.Sys.Api.MaxRequestSize = w.Int32(2000000)
+	c.V1.Sys.Api.MaxRequestSize = w.Int32(4000000)
 	c.V1.Sys.Api.BaseResourceUrl = w.String("host_header")
 	c.V1.Sys.Api.StrictSearchResultAcls = w.Bool(false)
 	c.V1.Sys.Api.ActionsFqdn = w.String("")
 	c.V1.Sys.Api.S3UrlTtl = w.Int32(900)
+	c.V1.Sys.Api.S3BucketName = w.String("")
+	c.V1.Sys.Api.S3Enabled = w.Bool(false)
+	c.V1.Sys.Api.S3ExternalUrl = w.String("")
 
 	c.V1.Sys.Keygen.WorkerCount = w.Int32(2)
 	c.V1.Sys.Keygen.CacheSize = w.Int32(1000)

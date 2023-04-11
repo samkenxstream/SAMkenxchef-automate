@@ -19,12 +19,14 @@ import (
 
 	dc "github.com/chef/automate/api/config/deployment"
 	api "github.com/chef/automate/api/interservice/deployment"
+	"github.com/chef/automate/components/automate-cli/pkg/docs"
 	"github.com/chef/automate/components/automate-cli/pkg/status"
 	"github.com/chef/automate/components/automate-deployment/pkg/backup"
 	"github.com/chef/automate/components/automate-deployment/pkg/client"
 	"github.com/chef/automate/components/automate-deployment/pkg/preflight"
 	"github.com/chef/automate/components/automate-deployment/pkg/target"
 	"github.com/chef/automate/lib/io/fileutils"
+	"github.com/chef/automate/lib/stringutils"
 	"github.com/chef/automate/lib/user"
 	flag "github.com/spf13/pflag"
 )
@@ -42,8 +44,8 @@ or all services are down (chef-automate stop) before retrying the restore.`
 var allPassedFlags string = ""
 
 const (
-	AUTOMATE_CMD_STOP  = "sudo chef-automate stop"
-	AUTOMATE_CMD_START = "sudo chef-automate start"
+	AUTOMATE_CMD_STOP  = "sudo systemctl stop chef-automate"
+	AUTOMATE_CMD_START = "sudo systemctl start chef-automate"
 	BACKUP_CONFIG      = "file_system"
 )
 
@@ -106,6 +108,7 @@ func init() {
 	backupCmd.AddCommand(streamStatusBackupCmd)
 
 	backupCmd.PersistentFlags().BoolVarP(&backupCmdFlags.noProgress, "no-progress", "", false, "Don't follow operation progress")
+	backupCmd.PersistentFlags().SetAnnotation("no-progress", docs.Compatibility, []string{docs.CompatiblewithStandalone})
 	backupCmd.PersistentFlags().Int64VarP(&backupCmdFlags.requestTimeout, "request-timeout", "r", 20, "API request timeout for deployment-service in seconds")
 	backupCmd.PersistentFlags().StringVar(&backupCmdFlags.s3Endpoint, "s3-endpoint", "", "The S3 region endpoint URL")
 	backupCmd.PersistentFlags().StringVar(&backupCmdFlags.s3AccessKey, "s3-access-key", "", "The S3 access key ID")
@@ -129,6 +132,7 @@ func init() {
 	restoreBackupCmd.PersistentFlags().StringVarP(&backupCmdFlags.hartifactsPath, "hartifacts", "", "", "The local path to search for override packages")
 	restoreBackupCmd.PersistentFlags().StringVarP(&backupCmdFlags.channel, "channel", "c", "current", "The habitat channel from which to install packages")
 	restoreBackupCmd.PersistentFlags().BoolVarP(&backupCmdFlags.upgrade, "upgrade", "u", false, "Upgrade to the latest package versions when restoring backups")
+	restoreBackupCmd.PersistentFlags().SetAnnotation("upgrade", docs.Compatibility, []string{docs.CompatiblewithStandalone})
 	restoreBackupCmd.PersistentFlags().BoolVarP(&backupCmdFlags.skipPreflight, "skip-preflight", "", false, "Skip preflight checks when restoring a backup")
 	restoreBackupCmd.PersistentFlags().BoolVarP(&backupCmdFlags.skipBootstrap, "skip-bootstrap", "", false, "Skip bootstrapping the machine with Habitat")
 	restoreBackupCmd.PersistentFlags().StringVar(&backupCmdFlags.airgap, "airgap-bundle", "", "The artifact to use for an air-gapped installation")
@@ -228,6 +232,9 @@ var streamStatusBackupCmd = &cobra.Command{
 	Long:  "Stream the Chef Automate backup runner status",
 	RunE:  runStreamBackupStatus,
 	Args:  cobra.ExactArgs(1),
+	Annotations: map[string]string{
+		docs.Tag: docs.Automate,
+	},
 }
 
 var cancelBackupCmd = &cobra.Command{
@@ -413,7 +420,7 @@ func runStreamBackupStatus(cmd *cobra.Command, args []string) error {
 		return status.Wrap(err, status.BackupError, "Streaming backup events failed")
 	}
 
-	if lastEvent != nil && lastEvent.GetBackup() != nil {
+	if lastEvent != nil && lastEvent.GetBackup() != nil && lastEvent.GetBackup().Description != nil {
 		status.GlobalResult = createBackupResult{
 			BackupId: backupTaskId,
 			SHA256:   lastEvent.GetBackup().Description.Sha256,
@@ -1241,8 +1248,8 @@ func (ins *BackupFromBashtionImp) executeOnRemoteAndPoolStatus(commandString str
 	if pooling {
 		cmdRes, err := sshUtil.connectAndExecuteCommandOnRemote(commandString, true)
 		if err != nil {
-			writer.Errorf("error in executing backup %s commands on Automate node %s,  %s \n", subCommand, automateIps[0], err.Error())
-			return status.Wrapf(err, status.BackupRestoreError, "error in executing backup commands on Automate node %s", automateIps[0])
+			writer.Errorf("error in executing backup %s commands on Automate node %s,  %s \n%s\n", subCommand, automateIps[0], err.Error(), cmdRes)
+			return status.Wrapf(err, status.BackupRestoreError, "error in executing backup commands on Automate node %s\n%s", automateIps[0], cmdRes)
 		}
 		writer.Printf("Triggered backup %s commands on Automate node %s \n %s \n", subCommand, automateIps[0], cmdRes)
 		writer.StartSpinner()
@@ -1253,21 +1260,26 @@ func (ins *BackupFromBashtionImp) executeOnRemoteAndPoolStatus(commandString str
 		}
 		return nil
 	} else {
-		_, err := sshUtil.connectAndExecuteCommandOnRemoteSteamOutput(commandString)
+		res, err := sshUtil.connectAndExecuteCommandOnRemoteSteamOutput(commandString)
 		if err != nil {
-			writer.Errorf("error in executing backup %s commands on Automate node %s,  %s \n", subCommand, automateIps[0], err.Error())
-			return status.Wrapf(err, status.BackupRestoreError, "error in executing backup %s commands on Automate node %s", subCommand, automateIps[0])
+			writer.Errorf("error in executing backup %s commands on Automate node %s,  %s \n%s\n", subCommand, automateIps[0], err.Error(), res)
+			return status.Wrapf(err, status.BackupRestoreError, "error in executing backup %s commands on Automate node %s\n%s", subCommand, automateIps[0], res)
 		}
 		return nil
 	}
 }
 
 func poolStatus(sshUtil SSHUtil, cmdRes string, backupState bool, subCommand string) error {
+	backupRestoreId := ""
 	for {
 		statusResponse, err := sshUtil.connectAndExecuteCommandOnRemote("sudo chef-automate backup status", false)
 		if err != nil {
 			writer.Errorf("error in polling backup status %s \n", err.Error())
 			return err
+		}
+		restoreOutput := strings.Split(statusResponse, " ")
+		if (strings.Contains(statusResponse, "Restoring backup") || strings.Contains(statusResponse, "Creating backup")) && stringutils.IsNumeric(restoreOutput[len(restoreOutput)-1]) && backupRestoreId == "" {
+			backupRestoreId = strings.TrimSpace(restoreOutput[len(restoreOutput)-1])
 		}
 		if strings.EqualFold(strings.ToLower(strings.TrimSpace(statusResponse)), "Idle") {
 			if backupState {
@@ -1279,7 +1291,13 @@ func poolStatus(sshUtil SSHUtil, cmdRes string, backupState bool, subCommand str
 				backupState := getBackupStateFromList(backupList, cmdRes)
 				writer.Println(backupState)
 			}
-			writer.Printf("\nBackup %s operation completed \n", subCommand)
+			if backupRestoreId != "" {
+				streamRes, err := sshUtil.connectAndExecuteCommandOnRemote("sudo chef-automate backup stream-status "+backupRestoreId, false)
+				if err != nil {
+					writer.Errorf("error in getting backup stream status %s \n%s\n", err.Error(), streamRes)
+				}
+			}
+			writer.Printf("\nBackup %s execution completed \n", subCommand)
 			break
 		}
 		time.Sleep(5 * time.Second)

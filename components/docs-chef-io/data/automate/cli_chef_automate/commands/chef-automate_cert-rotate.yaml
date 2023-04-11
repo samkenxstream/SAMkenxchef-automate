@@ -48,6 +48,10 @@ options:
   usage: Public certificate
 - name: root-ca
   usage: RootCA certificate
+- name: wait-timeout
+  default_value: "180"
+  usage: |
+    This flag sets the operation timeout duration (in seconds) for each individual node during the certificate rotation process
 inherited_options:
 - name: debug
   shorthand: d
@@ -60,3 +64,5 @@ inherited_options:
   usage: Write command result as JSON to PATH
 see_also:
 - chef-automate - Chef Automate CLI
+compatible_with: AutomateHA
+supported_on: Bastion

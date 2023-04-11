@@ -40,7 +40,7 @@ The list of parameters are as follows:
 | opscode_erchef['db_pool_queue_max']             | 40                                        | 20                                  | ```[erchef.v1.sys.sql]```<br>```pool_queue_max=40```              |
 | opscode_erchef['ibrowse_max_pipeline_size']     | 1                                         | 1                                   | ```[erchef.v1.sys.ibrowse]```<br>```ibrowse_max_pipeline_size=1```       |
 | opscode_erchef['ibrowse_max_sessions']          | 256                                       | 256                                 | ```[erchef.v1.sys.ibrowse]```<br>```ibrowse_max_sessions=256```            |
-| opscode_erchef['max_request_size']              | 2000000                                   | 2000000                             | ```[erchef.v1.sys.api]```<br>```max_request_size=2000000```          |
+| opscode_erchef['max_request_size']              | 4000000                                   | 4000000                             | ```[erchef.v1.sys.api]```<br>```max_request_size=4000000```          |
 | opscode_erchef['keygen_cache_size']             | 1000                                      | 10                                  | ```[erchef.v1.sys.keygen]```<br>```cache_size=1000```               |
 | opscode_erchef['reindex_batch_size']            | 10                                        | 10                                  | ```[erchef.v1.sys.index]```<br>```reindex_batch_size=10```        |
 | opscode_erchef['reindex_sleep_min_ms']          | 500                                       | 500                                 | ```[erchef.v1.sys.index]```<br>```reindex_sleep_min_ms=500```      |
@@ -48,6 +48,9 @@ The list of parameters are as follows:
 | opscode_erchef['reindex_item_retries']          | 3                                         | 3                                   | ```[erchef.v1.sys.index]```<br>```reindex_item_retries=3```      |
 | opscode_erchef['cbv_cache_enabled']             | FALSE                                     | FALSE                               | ```[erchef.v1.sys.api]```<br>```cbv_cache_enabled=false```           |
 | opscode_erchef['search_queue_mode']             | batch                                     | batch                               | ```[erchef.v1.sys.index]```<br>```search_queue_mode="batch"```         |
+| opscode_erchef['s3_enabled']             | FALSE                                     | FALSE                               | ```[erchef.v1.sys.api]```<br>```s3_enabled="true"```         |
+| opscode_erchef['s3_bucket_name']             | Bookshelf                                     | Bookshelf                               | ```[erchef.v1.sys.api]```<br>```s3_bucket_name="name"```         |
+| opscode_erchef['s3_external_url']             |                                      |                                | ```[erchef.v1.sys.api]```<br>```s3_external_url="url"```         |
 | oc_chef_authz['http_queue_max']                 | 200                                       | 200                                 | ```[erchef.v1.sys.authz]```<br>```pool_queue_max=200```            |
 | oc_chef_authz['http_max_count']                 | 100                                       | 100                                 | ```[erchef.v1.sys.authz]```<br>```pool_max_size=100```             |
 | oc_chef_authz['http_init_count']                | 100                                       | 100                                 | ```[erchef.v1.sys.authz]```<br>```pool_init_size=100```            |
@@ -61,6 +64,8 @@ The list of parameters are as follows:
 | oc_bifrost['db_pool_queue_max']                 | 50                                        | 50                                  | ```[bifrost.v1.sys.sql]```<br>```pool_queue_max=50```                 |
 | oc_bifrost['extended_perf_log']                 | TRUE                                      | TRUE                                | ```[bifrost.v1.sys.log]```<br>```extended_perf_log=true```            |
 | bookshelf['stream_download']                    | TRUE                                      | TRUE                                | ```[bookshelf.v1.sys.bookshelf]```<br>```stream_download=true```      |
+| bookshelf['aws_access_id']                    |                                       |                                 | ```[bookshelf.v1.sys.bookshelf]```<br>```aws_access_id=""```      |
+| bookshelf['aws_secret_key']                    |                                       |                                 | ```[bookshelf.v1.sys.bookshelf]```<br>```aws_secret_key=""```      |
 | oc_chef_wm['health_ping_timeout']               | 400                                       | 400                                 | ```[erchef.v1.sys.health]```<br>```health_ping_timeout=400```         |
 
 Click [here](https://docs.chef.io/server/config_rb_server_optional_settings/) for the detailed description of a above parameters.
